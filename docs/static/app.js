@@ -80,17 +80,17 @@ function renderUrl(params) {
   const r = q.get("r") || "0", g = q.get("g") || "1", b = q.get("b") || "2";
   const stem = path.replace(/\//g, "__");
   let name;
-  if (comp != null && comp !== "") name = `${stem}__c${comp}__${cmap}__${lo}-${hi}.png`;
-  else name = `${stem}__rgb${r}${g}${b}__${cmap}__${lo}-${hi}.png`;
+  if (comp != null && comp !== "") name = `${stem}__c${comp}__${cmap}__${lo}-${hi}.jpg`;
+  else name = `${stem}__rgb${r}${g}${b}__${cmap}__${lo}-${hi}.jpg`;
   return { url: "renders/" + name, path, lo, hi, cmap, comp, fallback: figureFallback(path) };
 }
 function figureFallback(path) {
   const rel = (path || "").replace(/\\/g, "/");
   const stem = rel.split("/").pop().replace(/\.npy$/, "");
   if (!stem) return null;
-  if (stem === "pca_scores") return "files/outputs/pca_rgb.png";
-  if (stem === "mnf_scores") return "files/outputs/mnf_rgb.png";
-  return "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".png");
+  if (stem === "pca_scores") return "files/outputs/pca_rgb.jpg";
+  if (stem === "mnf_scores") return "files/outputs/mnf_rgb.jpg";
+  return "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".jpg");
 }
 let _pixelGrid = null;
 async function pixelFromGrid(row, col, dir) {
@@ -593,11 +593,11 @@ const Scores = {
   },
   draw(all) {
     const cm = $("#scCmap").value;
-    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}" data-fb="files/outputs/pca_rgb.png" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
+    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}" data-fb="files/outputs/pca_rgb.jpg" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
     const m = this.mfs.find(x => x.label === this.mf);
     if (m) { const fb = figureFallback(m.file); $("#mfBig").innerHTML = `<img src="${this.url(m.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}>`; $("#mfCap").textContent = `${m.label} · ${m.file}`; $("#mfBigSel").value = m.label } else $("#mfBig").innerHTML = '<span class="muted">No matched-filter maps yet.</span>';
     if (all) {
-      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}" data-fb="files/outputs/pca_rgb.png" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
+      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}" data-fb="files/outputs/pca_rgb.jpg" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
       $("#mfThumbs").innerHTML = this.mfs.length ? this.mfs.map(x => { const fb = figureFallback(x.file); return `<div class="th" data-n="${esc(x.label)}"><img loading="lazy" src="${this.url(x.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}><span>${esc(x.label)}</span></div>`; }).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
       $$("#pcThumbs .th").forEach(t => t.onclick = () => { this.pc = +t.dataset.i; this.draw(); window.scrollTo({ top: $("#pcBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
       $$("#mfThumbs .th").forEach(t => t.onclick = () => { this.mf = t.dataset.n; this.draw(); window.scrollTo({ top: $("#mfBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
