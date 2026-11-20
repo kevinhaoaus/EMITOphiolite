@@ -138,10 +138,12 @@ function applyStaticUI() {
   const note = document.getElementById("staticNote");
   if (note) note.hidden = false;
   const foot = document.getElementById("siteFoot");
-  if (foot) foot.textContent = "Read-only showcase · github.com/kevinhaoaus/EMITOphiolite · run the pipeline locally to generate new maps";
+  if (foot) foot.textContent = "Finished map of one NASA pass over Oman · a bright pixel is a mineral match, not a tonne of stored CO₂ · github.com/kevinhaoaus/EMITOphiolite";
   const pill = document.getElementById("jobPillText");
   if (pill) pill.textContent = "showcase";
   document.getElementById("jobPill")?.classList.add("success");
+  const runLink = document.querySelector('nav a[data-page="run"]');
+  if (runLink) runLink.textContent = "Run log";
   $$(".tile").forEach(t => { t.classList.add("disabled"); t.onclick = ev => { ev.preventDefault(); toast(STATIC_MSG, true) }; t.onmouseenter = null; });
   const stop = document.getElementById("stopBtn");
   if (stop) stop.disabled = true;
@@ -173,9 +175,9 @@ async function loadStatus() {
   try {
     const s = await api("/api/status"); const sc = s.scene || {};
     $("#stats").innerHTML = [
-      [sc.shape ? sc.shape.slice(0, 2).join(" × ") : "—", "scene px"], [sc.shape ? sc.shape[2] : "—", "bands"],
-      [sc.good_bands ?? "—", "good bands"], [s.boxes, "exclude boxes"],
-      [s.outputs.reduce((a, d) => a + d.png, 0), "PNG outputs"]].map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("");
+      [sc.shape ? sc.shape.slice(0, 2).join(" × ") : "—", "pixels in this scene"], [sc.shape ? sc.shape[2] : "—", "wavelengths"],
+      [sc.good_bands ?? "—", "usable wavelengths"], [s.boxes, "masked patches"],
+      [s.outputs.reduce((a, d) => a + d.png, 0), "maps"]].map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("");
     $("#pyver").textContent = (window.STATIC ? "GitHub Pages · read-only" : "server · python " + s.python);
     if (s.job && s.job.state === "running" && !Run.job) Run.attach(s.job);
   } catch (e) { $("#stats").innerHTML = `<div class="stat"><b>offline</b><span>${esc(e.message)}</span></div>` }
@@ -653,7 +655,7 @@ async function boot() {
     setInterval(loadStatus, 15000);
     api("/api/jobs/current").then(j => j && Run.attach(j)).catch(() => { });
   }
-  const def = window.STATIC ? "pipeline" : "run";
+  const def = window.STATIC ? "explorer" : "run";
   go((location.hash || ("#" + def)).slice(1) in pages ? (location.hash || ("#" + def)).slice(1) : def);
 }
 boot();

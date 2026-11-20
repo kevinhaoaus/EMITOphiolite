@@ -239,8 +239,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 #pcBtns{flex-wrap:nowrap}
 body:not([data-page=run]) .hero{padding:30px 0 22px;margin-bottom:28px}
 body:not([data-page=run]) .hero h1{font-size:34px;letter-spacing:-.8px}
-body:not([data-page=run]) .hero .lede{display:none}
+body:not([data-page=run]) .hero .lede{font-size:16px;margin-top:12px}
 body:not([data-page=run]) .hero .stats{margin-top:14px}
+.howto{margin-top:22px;max-width:760px}
+.howto p{margin:0;color:var(--ink2)}
+.howto-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+body[data-page=run] .howto{display:none}
 
 /* static showcase + mobile */
 .static-note{display:none;margin-top:18px;padding:12px 16px;border:1px solid var(--line2);background:var(--accent-soft);border-radius:8px;color:var(--ink2);font-size:13.5px;max-width:720px}
