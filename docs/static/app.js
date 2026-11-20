@@ -575,7 +575,7 @@ const Pipeline = {
 /* ---------------- SCORES ---------------- */
 const Scores = {
   loaded: false, dir: "outputs", pc: 0, mf: null,
-  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); if (!window.STATIC) return "/api/render?" + q; const info = renderUrl(q); return info.url; },
+  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); if (!window.STATIC) return "/api/render?" + q; const info = renderUrl(q); const idx = window._renderIndex || {}; const rel = (path || "").replace(/\\/g, "/"); const lo = nearestStretch(s); const key = (o.component != null ? ("c" + o.component + "|" + (o.cmap || "viridis")) : ("rgb" + (q.get("r")||0) + (q.get("g")||1) + (q.get("b")||2) + "|" + (o.cmap || "viridis"))) + "|" + lo + "-" + (100 - lo); const ent = idx[rel] || {}; if (ent[key] && ent[key].file) return ent[key].file; return info.fallback || info.url; },
   async init() {
     if (!this.bound) { this.bound = true; $("#scStretch").onchange = () => this.draw(true); $("#scStretch").oninput = () => $("#scStretchLbl").textContent = `${$("#scStretch").value}–${100 - $("#scStretch").value}%`; $("#scCmap").onchange = () => this.draw(true); $("#mfBigSel").onchange = () => { this.mf = $("#mfBigSel").value; this.draw() } }
     if (this.loaded) return; this.loaded = true;
@@ -611,6 +611,7 @@ async function boot() {
   await detectStatic();
   if (window.STATIC) {
     applyStaticUI();
+    await renderIndex();
     try {
       const t = await (await fetch("api/runs/full-013-cli.log")).text();
       const term = $("#term");
