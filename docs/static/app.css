@@ -274,6 +274,9 @@ body.static .adv, body.static .form, body.static .cmdprev{opacity:.7}
   .scores-bar{gap:14px}
   .thumbs{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
   .term{font-size:11px}
-  .diagram{overflow-x:auto}
+  body{overflow-x:hidden}
+.wrap,.card,.hero,.page,.diagram{max-width:100%;min-width:0}
+.diagram{overflow-x:auto}
+.diagram svg{max-width:100%;height:auto}
 }
 
