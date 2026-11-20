@@ -247,10 +247,12 @@ body:not([data-page=run]) .hero .stats{margin-top:14px}
 body.static .static-note, .static-note:not([hidden]){display:block}
 body.static .tile, body.static .tile.primary{opacity:.45;pointer-events:none}
 body.static .adv, body.static .form, body.static .cmdprev{opacity:.7}
-.static-note{overflow-wrap:break-word;word-break:break-word}
-.kpi,.kpis{min-width:0}
+
+.static-note{overflow-wrap:anywhere;word-break:break-word;max-width:100%;box-sizing:border-box}
+.wrap,.hero,.page,.card,.stats,.stat,.kpis,.kpi,.diagram,.map-grid,.two,.two-eq,.run-grid{min-width:0}
 @media (max-width:700px){
-  .wrap{padding:0 14px}
+  html,body{width:100%;max-width:100%}
+  .wrap{padding:0 14px;width:100%;max-width:100%;box-sizing:border-box}
   .topbar-in{flex-wrap:wrap;height:auto;min-height:52px;gap:6px 16px;padding:8px 0 0}
   .wordmark{font-size:17px}
   nav{gap:14px;flex-wrap:wrap;width:100%;order:3;border-top:1px solid var(--line);padding:0}
@@ -260,23 +262,24 @@ body.static .adv, body.static .form, body.static .cmdprev{opacity:.7}
   h1{font-size:28px;letter-spacing:-.6px}
   body:not([data-page=run]) .hero h1{font-size:26px}
   .lede{font-size:15.5px}
-  .hero{padding:28px 0 20px;margin-bottom:22px}
-  .stats{gap:14px 18px}
+  .hero{padding:28px 0 20px;margin-bottom:22px;max-width:100%}
+  .stats{gap:10px 12px;max-width:100%}
+  .stat{flex:1 1 calc(50% - 12px);min-width:0;overflow-wrap:anywhere}
+  .static-note{max-width:100%}
   .tiles{grid-template-columns:1fr}
   .console-card{min-height:280px}
-  .kpis{grid-template-columns:1fr 1fr;gap:10px}
-  .kpi{padding:12px 12px}
-  .kpi b{font-size:26px;letter-spacing:-.6px}
+  .kpis{grid-template-columns:1fr 1fr;gap:0;width:100%}
+  .kpi{padding:12px;min-width:0;overflow-wrap:anywhere;border-left:none;border-top:1px solid var(--line)}
+  .kpi:nth-child(-n+2){border-top:none}
+  .kpi:nth-child(odd){border-right:1px solid var(--line)}
+  .kpi b{font-size:clamp(20px,7.2vw,26px);letter-spacing:-.6px;overflow-wrap:anywhere}
   .charts,.detail,.two-eq,.run-grid,.two,.map-grid{grid-template-columns:1fr}
   .mapwrap,.mapwrap.tall{min-height:360px;height:70vw}
   .side-panel{order:2}
-  .card{padding:16px 16px}
+  .card{padding:16px 16px;max-width:100%;box-sizing:border-box}
   .scores-bar{gap:14px}
   .thumbs{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
   .term{font-size:11px}
-  body{overflow-x:hidden}
-.wrap,.card,.hero,.page,.diagram{max-width:100%;min-width:0}
-.diagram{overflow-x:auto}
-.diagram svg{max-width:100%;height:auto}
+  .diagram{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .diagram svg{width:100%;height:auto;display:block}
 }
-

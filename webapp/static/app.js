@@ -46,7 +46,7 @@ const api = async (u, o) => {
       const q = new URLSearchParams((u.split("?")[1] || ""));
       return pixelFromGrid(+q.get("row"), +q.get("col"), (q.get("dir") || "outputs").replace(/\\/g, "/"));
     }
-    const r = await fetch(p);
+    const r = await fetch(assetUrl(p));
     if (!r.ok) throw new Error("Not available in the static showcase");
     const ct = r.headers.get("content-type") || "";
     if (p.endsWith(".json") || ct.includes("json")) return r.json();
@@ -54,15 +54,34 @@ const api = async (u, o) => {
   }
   return liveFetch(u, o);
 };
+function assetUrl(rel) {
+  rel = String(rel || "").replace(/\\/g, "/").replace(/^\//, "");
+  if (!rel) return assetUrl(".");
+  if (/^https?:/i.test(rel)) return rel;
+  let p = location.pathname || "/";
+  if (p.endsWith("index.html")) p = p.slice(0, -10);
+  if (!p.endsWith("/")) {
+    const last = p.substring(p.lastIndexOf("/") + 1);
+    p = last.includes(".") ? p.slice(0, p.lastIndexOf("/") + 1) : (p + "/");
+  }
+  return p + rel;
+}
+function staticFile(p) {
+  let rel = String(p || "").replace(/\\/g, "/").replace(/^\//, "");
+  if (rel.startsWith("files/") || rel.startsWith("renders/") || rel.startsWith("api/") || rel.startsWith("static/"))
+    return assetUrl(rel);
+  // Layer paths from the API (outputs/pca_rgb.jpg) live under files/.
+  if (/\.(jpe?g|png|gif|webp)$/i.test(rel)) return assetUrl("files/" + rel);
+  return assetUrl(rel);
+}
 const fileUrl = (p, dl) => {
-  const rel = String(p || "").replace(/\\/g, "/");
-  if (window.STATIC) return "files/" + rel.replace(/^\//, "");
+  if (window.STATIC) return staticFile(p);
   return `/api/file?path=${encodeURIComponent(p)}${dl ? "&download=1" : ""}&t=${Date.now() % 1e7}`;
 };
 window._renderIndex = null;
 async function renderIndex() {
   if (window._renderIndex) return window._renderIndex;
-  try { window._renderIndex = await (await fetch("api/renders.json")).json(); } catch (e) { window._renderIndex = {}; }
+  try { window._renderIndex = await (await fetch(assetUrl("api/renders.json"))).json(); } catch (e) { window._renderIndex = {}; }
   return window._renderIndex;
 }
 function nearestStretch(lo) {
@@ -82,20 +101,21 @@ function renderUrl(params) {
   let name;
   if (comp != null && comp !== "") name = `${stem}__c${comp}__${cmap}__${lo}-${hi}.jpg`;
   else name = `${stem}__rgb${r}${g}${b}__${cmap}__${lo}-${hi}.jpg`;
-  return { url: "renders/" + name, path, lo, hi, cmap, comp, fallback: figureFallback(path) };
+  return { url: assetUrl("renders/" + name), path, lo, hi, cmap, comp, fallback: figureFallback(path) };
 }
 function figureFallback(path) {
   const rel = (path || "").replace(/\\/g, "/");
   const stem = rel.split("/").pop().replace(/\.npy$/, "");
   if (!stem) return null;
-  if (stem === "pca_scores") return "files/outputs/pca_rgb.jpg";
-  if (stem === "mnf_scores") return "files/outputs/mnf_rgb.jpg";
-  return "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".jpg");
+  if (stem === "pca_scores") return assetUrl("files/outputs/pca_rgb.jpg");
+  if (stem === "mnf_scores") return assetUrl("files/outputs/mnf_rgb.jpg");
+  const figure = "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".jpg");
+  return assetUrl(figure);
 }
 let _pixelGrid = null;
 async function pixelFromGrid(row, col, dir) {
   if (!_pixelGrid) {
-    const r = await fetch("api/pixel-grid.json");
+    const r = await fetch(assetUrl("api/pixel-grid.json"));
     if (!r.ok) throw new Error("no pixel grid");
     _pixelGrid = await r.json();
   }
@@ -394,7 +414,7 @@ const L2B = {
     }
     if (this.loaded) return; this.loaded = true; $("#l2bEmpty").classList.add("show");
     try {
-      const [s, buf] = await Promise.all([api("/api/l2b/summary"), fetch(window.STATIC ? "api/l2b/ids.bin" : "/api/l2b/ids.bin").then(r => { if (!r.ok) throw new Error("L2B ids missing"); return r.arrayBuffer(); })]);
+      const [s, buf] = await Promise.all([api("/api/l2b/summary"), fetch(window.STATIC ? assetUrl("api/l2b/ids.bin") : "/api/l2b/ids.bin").then(r => { if (!r.ok) throw new Error("L2B ids missing"); return r.arrayBuffer(); })]);
       this.sum = s; this.recolor(s); this.ids = new Int16Array(buf); this.byId = {}; s.classes.forEach(c => this.byId[c.id] = c);
       this.vis = new Set(s.classes.filter(c => c.id).map(c => c.id));
       this.cv = document.createElement("canvas"); this.cv.width = s.shape[1]; this.cv.height = s.shape[0];
@@ -433,7 +453,7 @@ const Runs = {
       <div><b>${esc(r.kind)}</b> <span class="muted small">· ${fmtT(r.runtime)} · exit ${r.exit_code ?? "—"} · ${esc(r.out_dir)} · ${r.images.length} images</span><div class="cmd">${esc(r.command)}</div></div>
       <div class="acts"><button class="btn sm ghost" data-log="${r.id}">Log</button><button class="btn sm" data-out="${r.id}">Outputs</button></div></div>`).join("")
       : `<div class="emptybox">No runs yet. Launch one from the <a data-goto="run">Run</a> tab — each run is saved to webapp\\runs\\ with its command, exit code, runtime and log.</div>`;
-    $$("[data-log]").forEach(b => b.onclick = async () => { const url = window.STATIC ? "api/runs/" + b.dataset.log + ".log" : `/api/runs/${b.dataset.log}/log`; const t = await (await fetch(url)).text(); go("run"); $("#termTitle").textContent = b.dataset.log + ".log"; $("#term").textContent = t });
+    $$("[data-log]").forEach(b => b.onclick = async () => { const url = window.STATIC ? assetUrl("api/runs/" + b.dataset.log + ".log") : `/api/runs/${b.dataset.log}/log`; const t = await (await fetch(url)).text(); go("run"); $("#termTitle").textContent = b.dataset.log + ".log"; $("#term").textContent = t });
     $$("[data-out]").forEach(b => b.onclick = () => this.gallery(this.runs.find(r => r.id === b.dataset.out)));
     const opts = [...this.runs.filter(r => r.images.length).map(r => [r.id, `${r.kind} · ${new Date(r.started * 1000).toLocaleString()}`, r.out_dir]), ...(await api("/api/outputs/dirs").catch(() => [])).map(d => ["dir:" + d.dir, "current " + d.dir, d.dir])];
     this.opts = opts; const o = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
@@ -575,7 +595,7 @@ const Pipeline = {
 /* ---------------- SCORES ---------------- */
 const Scores = {
   loaded: false, dir: "outputs", pc: 0, mf: null,
-  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); if (!window.STATIC) return "/api/render?" + q; const info = renderUrl(q); const idx = window._renderIndex || {}; const rel = (path || "").replace(/\\/g, "/"); const lo = nearestStretch(s); const key = (o.component != null ? ("c" + o.component + "|" + (o.cmap || "viridis")) : ("rgb" + (q.get("r")||0) + (q.get("g")||1) + (q.get("b")||2) + "|" + (o.cmap || "viridis"))) + "|" + lo + "-" + (100 - lo); const ent = idx[rel] || {}; if (ent[key] && ent[key].file) return ent[key].file; return info.fallback || info.url; },
+  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); if (!window.STATIC) return "/api/render?" + q; const info = renderUrl(q); const idx = window._renderIndex || {}; const rel = (path || "").replace(/\\/g, "/"); const lo = nearestStretch(s); const key = (o.component != null ? ("c" + o.component + "|" + (o.cmap || "viridis")) : ("rgb" + (q.get("r")||0) + (q.get("g")||1) + (q.get("b")||2) + "|" + (o.cmap || "viridis"))) + "|" + lo + "-" + (100 - lo); const ent = idx[rel] || {}; if (ent[key] && ent[key].file) return assetUrl(ent[key].file); return info.fallback || info.url; },
   async init() {
     if (!this.bound) { this.bound = true; $("#scStretch").onchange = () => this.draw(true); $("#scStretch").oninput = () => $("#scStretchLbl").textContent = `${$("#scStretch").value}–${100 - $("#scStretch").value}%`; $("#scCmap").onchange = () => this.draw(true); $("#mfBigSel").onchange = () => { this.mf = $("#mfBigSel").value; this.draw() } }
     if (this.loaded) return; this.loaded = true;
@@ -593,11 +613,11 @@ const Scores = {
   },
   draw(all) {
     const cm = $("#scCmap").value;
-    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}" data-fb="files/outputs/pca_rgb.jpg" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
+    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}" data-fb="${assetUrl("files/outputs/pca_rgb.jpg")}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
     const m = this.mfs.find(x => x.label === this.mf);
     if (m) { const fb = figureFallback(m.file); $("#mfBig").innerHTML = `<img src="${this.url(m.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}>`; $("#mfCap").textContent = `${m.label} · ${m.file}`; $("#mfBigSel").value = m.label } else $("#mfBig").innerHTML = '<span class="muted">No matched-filter maps yet.</span>';
     if (all) {
-      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}" data-fb="files/outputs/pca_rgb.jpg" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
+      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}" data-fb="${assetUrl("files/outputs/pca_rgb.jpg")}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
       $("#mfThumbs").innerHTML = this.mfs.length ? this.mfs.map(x => { const fb = figureFallback(x.file); return `<div class="th" data-n="${esc(x.label)}"><img loading="lazy" src="${this.url(x.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}><span>${esc(x.label)}</span></div>`; }).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
       $$("#pcThumbs .th").forEach(t => t.onclick = () => { this.pc = +t.dataset.i; this.draw(); window.scrollTo({ top: $("#pcBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
       $$("#mfThumbs .th").forEach(t => t.onclick = () => { this.mf = t.dataset.n; this.draw(); window.scrollTo({ top: $("#mfBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
@@ -613,7 +633,7 @@ async function boot() {
     applyStaticUI();
     await renderIndex();
     try {
-      const t = await (await fetch("api/runs/full-013-cli.log")).text();
+      const t = await (await fetch(assetUrl("api/runs/full-013-cli.log"))).text();
       const term = $("#term");
       if (term && (!term.textContent || term.textContent.includes("ready"))) {
         $("#termTitle").textContent = "full 013 scene · completed run";
