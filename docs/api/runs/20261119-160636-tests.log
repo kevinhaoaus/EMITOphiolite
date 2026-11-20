@@ -1,0 +1,24 @@
+$ py -3.11 -m pytest tests -q --color=no
+..................                                                       [100%]
+============================== warnings summary ===============================
+tests/test_streaming.py: 14 warnings
+  C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\src\plotting.py:59: PendingDeprecationWarning: The set_bad function will be deprecated in a future version. Use cmap.with_extremes(bad=...) or Colormap(bad=...) instead.
+    colormap.set_bad(_DARK)
+
+tests/test_streaming.py::test_pipeline_streams_small_granule
+tests/test_streaming.py::test_pipeline_streams_small_granule
+  C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\src\plotting.py:94: PendingDeprecationWarning: The set_bad function will be deprecated in a future version. Use cmap.with_extremes(bad=...) or Colormap(bad=...) instead.
+    colormap.set_bad(_DARK)
+
+tests/test_streaming.py::test_pipeline_streams_small_granule
+tests/test_streaming.py::test_pipeline_streams_small_granule
+  C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\src\plotting.py:95: PendingDeprecationWarning: The set_under function will be deprecated in a future version. Use cmap.with_extremes(under=...) or Colormap(under=...) instead.
+    colormap.set_under(_DARK)
+
+tests/test_streaming.py::test_pipeline_streams_small_granule
+tests/test_streaming.py::test_pipeline_streams_small_granule
+  C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\src\plotting.py:96: PendingDeprecationWarning: The set_over function will be deprecated in a future version. Use cmap.with_extremes(over=...) or Colormap(over=...) instead.
+    colormap.set_over(_DARK)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+18 passed, 20 warnings in 4.09s

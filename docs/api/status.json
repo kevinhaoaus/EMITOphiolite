@@ -1,0 +1,1 @@
+{"root":"static","scene":{"file":"EMIT_L2A_RFL_001_20260220T072251_2605105_013.nc","exists":true,"shape":[1280,1242,285],"good_bands":225,"size_gb":1.85},"outputs":[{"dir":"outputs","png":25,"npy":22},{"dir":"outputs/subset","png":23,"npy":22}],"l2b_exists":true,"boxes":22,"job":null,"python":"static","static":true}

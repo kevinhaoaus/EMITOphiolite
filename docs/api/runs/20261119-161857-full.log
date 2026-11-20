@@ -1,0 +1,31 @@
+$ py -3.11 -u pipeline.py --reflectance data\EMIT_L2A_RFL_001_20260220T072251_2605105_013.nc --usgs usgs --out outputs --components 8 --max-fit-pixels 80000 --chunk-rows 128 --mask-boxes data\manual_mask_boxes.json
+reflectance (1280, 1242, 285) rows 0:1280 -> scene (1280, 1242), good bands 225/285, chunk rows 128
+exclude boxes 22 excluded pixels 124691 (half-open, full-granule coords)
+pass 1 chunk 1/10
+pass 1 chunk 2/10
+pass 1 chunk 3/10
+pass 1 chunk 4/10
+pass 1 chunk 5/10
+pass 1 chunk 6/10
+pass 1 chunk 7/10
+pass 1 chunk 8/10
+pass 1 chunk 9/10
+pass 1 chunk 10/10
+pass 1: finite pixels 1465069, scene-wide SWIR shadow threshold (8th pct) 0.11756, MNF signal sample 80000/1465069, noise pairs 40000/1462041
+fit sample: 80000 finite prepared spectra (cap 80000)
+library targets 13
+Traceback (most recent call last):
+  File "C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\pipeline.py", line 473, in <module>
+    main()
+  File "C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\pipeline.py", line 469, in main
+    run(build_parser().parse_args(argv))
+  File "C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\pipeline.py", line 363, in run
+    maps = _open_maps(out / "maps", specs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Default.DESKTOP-NUBLEQ1\Desktop\KernelHackthon-Geology+\pipeline.py", line 175, in _open_maps
+    mm = open_memmap(str(directory / f"{name}.npy"), mode="w+", dtype=dtype, shape=shape)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Default.DESKTOP-NUBLEQ1\AppData\Local\Python\pythoncore-3.11-64\Lib\site-packages\numpy\lib\_format_impl.py", line 966, in open_memmap
+    with open(os.fspath(filename), mode + 'b') as fp:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument: 'outputs\\maps\\pca_scores.npy'

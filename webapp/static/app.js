@@ -1,11 +1,146 @@
 "use strict";
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const api = async (u, o) => { const r = await fetch(u, o); if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch (e) { } throw new Error(m) } return r.headers.get("content-type")?.includes("json") ? r.json() : r };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmtN = n => n == null ? "—" : Number(n).toLocaleString();
 const fmtT = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ":" : "") + String(m).padStart(2, "0") + ":" + String(x).padStart(2, "0") };
-const fileUrl = (p, dl) => `/api/file?path=${encodeURIComponent(p)}${dl ? "&download=1" : ""}&t=${Date.now() % 1e7}`;
 function toast(msg, err) { const t = $("#toast"); t.textContent = msg; t.className = "toast show" + (err ? " err" : ""); clearTimeout(t._h); t._h = setTimeout(() => t.className = "toast", 4200) }
+
+const STATIC_MSG = "This is a read-only showcase. Running the pipeline needs the local app.";
+function staticApiPath(u) {
+  const raw = u.startsWith("http") ? new URL(u).pathname + (new URL(u).search) : u;
+  const [path, qs] = raw.split("?");
+  const q = new URLSearchParams(qs || "");
+  const dir = (q.get("dir") || "outputs").replace(/\\/g, "/");
+  const key = dir.replace(/\//g, "-");
+  if (path === "/api/status") return "api/status.json";
+  if (path === "/api/pipeline/facts") return "api/pipeline/facts.json";
+  if (path === "/api/pipeline/flags") return "api/pipeline/flags.json";
+  if (path === "/api/stats/mf") return "api/stats/mf.json";
+  if (path === "/api/stats/sam") return "api/stats/sam.json";
+  if (path === "/api/layers") return "api/layers-" + key + ".json";
+  if (path === "/api/outputs/dirs") return "api/dirs.json";
+  if (path === "/api/boxes") return "api/boxes.json";
+  if (path === "/api/library") return "api/library.json";
+  if (path === "/api/l2b/summary") return "api/l2b/summary.json";
+  if (path === "/api/l2b/ids.bin") return "api/l2b/ids.bin";
+  if (path === "/api/runs") return "api/runs.json";
+  if (path === "/api/jobs/current") return "api/jobs-current.json";
+  const log = path.match(/^\/api\/runs\/([^/]+)\/log$/);
+  if (log) return "api/runs/" + log[1] + ".log";
+  if (path === "/api/pixel") return "api/pixel-grid.json";
+  if (path === "/api/spectrum") return null;
+  return null;
+}
+async function liveFetch(u, o) {
+  const r = await fetch(u, o);
+  if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m } catch (e) { } throw new Error(m) }
+  const ct = r.headers.get("content-type") || "";
+  return ct.includes("json") ? r.json() : r;
+}
+const api = async (u, o) => {
+  if (window.STATIC) {
+    if (o && o.method && o.method.toUpperCase() !== "GET") throw new Error(STATIC_MSG);
+    const p = staticApiPath(u);
+    if (!p) throw new Error(u.startsWith("/api/spectrum") ? "Pixel spectra are available in the local app." : STATIC_MSG);
+    if (p === "api/pixel-grid.json") {
+      const q = new URLSearchParams((u.split("?")[1] || ""));
+      return pixelFromGrid(+q.get("row"), +q.get("col"), (q.get("dir") || "outputs").replace(/\\/g, "/"));
+    }
+    const r = await fetch(p);
+    if (!r.ok) throw new Error("Not available in the static showcase");
+    const ct = r.headers.get("content-type") || "";
+    if (p.endsWith(".json") || ct.includes("json")) return r.json();
+    return r;
+  }
+  return liveFetch(u, o);
+};
+const fileUrl = (p, dl) => {
+  const rel = String(p || "").replace(/\\/g, "/");
+  if (window.STATIC) return "files/" + rel.replace(/^\//, "");
+  return `/api/file?path=${encodeURIComponent(p)}${dl ? "&download=1" : ""}&t=${Date.now() % 1e7}`;
+};
+window._renderIndex = null;
+async function renderIndex() {
+  if (window._renderIndex) return window._renderIndex;
+  try { window._renderIndex = await (await fetch("api/renders.json")).json(); } catch (e) { window._renderIndex = {}; }
+  return window._renderIndex;
+}
+function nearestStretch(lo) {
+  const loN = Number(lo); const opts = [0, 2, 5, 10];
+  return opts.reduce((a, b) => Math.abs(b - loN) < Math.abs(a - loN) ? b : a, 2);
+}
+function renderUrl(params) {
+  const q = params instanceof URLSearchParams ? params : new URLSearchParams(params);
+  if (!window.STATIC) return "/api/render?" + q;
+  const path = (q.get("path") || "").replace(/\\/g, "/");
+  const lo = nearestStretch(q.get("lo") || 2);
+  const hi = 100 - lo;
+  const cmap = q.get("cmap") || "viridis";
+  const comp = q.get("component");
+  const r = q.get("r") || "0", g = q.get("g") || "1", b = q.get("b") || "2";
+  const stem = path.replace(/\//g, "__");
+  let name;
+  if (comp != null && comp !== "") name = `${stem}__c${comp}__${cmap}__${lo}-${hi}.png`;
+  else name = `${stem}__rgb${r}${g}${b}__${cmap}__${lo}-${hi}.png`;
+  return { url: "renders/" + name, path, lo, hi, cmap, comp, fallback: figureFallback(path) };
+}
+function figureFallback(path) {
+  const rel = (path || "").replace(/\\/g, "/");
+  const stem = rel.split("/").pop().replace(/\.npy$/, "");
+  if (!stem) return null;
+  if (stem === "pca_scores") return "files/outputs/pca_rgb.png";
+  if (stem === "mnf_scores") return "files/outputs/mnf_rgb.png";
+  return "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".png");
+}
+let _pixelGrid = null;
+async function pixelFromGrid(row, col, dir) {
+  if (!_pixelGrid) {
+    const r = await fetch("api/pixel-grid.json");
+    if (!r.ok) throw new Error("no pixel grid");
+    _pixelGrid = await r.json();
+  }
+  const G = _pixelGrid, step = G.step || 80;
+  const ri = Math.max(0, Math.min(G.rows.length - 1, Math.round(row / step)));
+  const ci = Math.max(0, Math.min(G.cols.length - 1, Math.round(col / step)));
+  const lab = G.labels?.[ri]?.[ci];
+  const ang = G.angles?.[ri]?.[ci];
+  const name = (lab >= 0 && G.names && G.names[lab]) ? G.names[lab] : (lab === -1 ? "not mapped / > 0.12 rad" : lab);
+  const values = [];
+  if (lab != null) values.push({ layer: "outputs/maps/sam_labels.npy", label: "SAM · Labels", value: lab, name });
+  if (ang != null) values.push({ layer: "outputs/maps/sam_angles.npy", label: "SAM · Angles (rad)", value: ang });
+  const in_boxes = [];
+  if (window._boxes) window._boxes.forEach((b, i) => { if (b[0] <= row && row < b[1] && b[2] <= col && col < b[3]) in_boxes.push(i); });
+  return { row, col, values, in_boxes, snapped: [G.rows[ri], G.cols[ci]] };
+}
+
+function applyStaticUI() {
+  document.body.classList.add("static");
+  const note = document.getElementById("staticNote");
+  if (note) note.hidden = false;
+  const foot = document.getElementById("siteFoot");
+  if (foot) foot.textContent = "Read-only showcase · github.com/kevinhaoaus/EMITOphiolite · run the pipeline locally to generate new maps";
+  const pill = document.getElementById("jobPillText");
+  if (pill) pill.textContent = "showcase";
+  document.getElementById("jobPill")?.classList.add("success");
+  $$(".tile").forEach(t => { t.classList.add("disabled"); t.onclick = ev => { ev.preventDefault(); toast(STATIC_MSG, true) }; t.onmouseenter = null; });
+  const stop = document.getElementById("stopBtn");
+  if (stop) stop.disabled = true;
+  const phase = document.getElementById("phase");
+  if (phase) phase.textContent = "Read-only showcase of the completed 013 scene run. Use the local app to launch a new job.";
+}
+
+async function detectStatic() {
+  if (window.STATIC) return true;
+  try {
+    const r = await fetch("/api/status", { cache: "no-store" });
+    if (r.ok) return false;
+  } catch (e) { }
+  try {
+    const r = await fetch("api/status.json", { cache: "no-store" });
+    if (r.ok) { window.STATIC = true; return true; }
+  } catch (e) { }
+  return false;
+}
 
 /* ---------------- navigation ---------------- */
 const pages = { run: null, pipeline: () => Pipeline.init(), scores: () => Scores.init(), explorer: () => Explorer.init(), l2b: () => L2B.init(), runs: () => Runs.load() };
@@ -21,7 +156,7 @@ async function loadStatus() {
       [sc.shape ? sc.shape.slice(0, 2).join(" × ") : "—", "scene px"], [sc.shape ? sc.shape[2] : "—", "bands"],
       [sc.good_bands ?? "—", "good bands"], [s.boxes, "exclude boxes"],
       [s.outputs.reduce((a, d) => a + d.png, 0), "PNG outputs"]].map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("");
-    $("#pyver").textContent = "server · python " + s.python;
+    $("#pyver").textContent = (window.STATIC ? "GitHub Pages · read-only" : "server · python " + s.python);
     if (s.job && s.job.state === "running" && !Run.job) Run.attach(s.job);
   } catch (e) { $("#stats").innerHTML = `<div class="stat"><b>offline</b><span>${esc(e.message)}</span></div>` }
 }
@@ -49,9 +184,10 @@ const Run = {
     this.preview("full");
   },
   async preview(kind) {
-    try { const r = await api("/api/pipeline/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, params: this.params() }) }); $("#cmdPreview").textContent = r.command || ("⚠ " + r.error) } catch (e) { }
+    if (window.STATIC) { $("#cmdPreview").textContent = "Available in the local app only."; return } try { const r = await api("/api/pipeline/preview", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, params: this.params() }) }); $("#cmdPreview").textContent = r.command || ("⚠ " + r.error) } catch (e) { }
   },
   async start(kind) {
+    if (window.STATIC) return toast(STATIC_MSG, true);
     if (this.job && this.job.state === "running") return toast("A job is already running — stop it first.", true);
     try { const j = await api("/api/jobs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, params: this.params() }) }); $("#term").innerHTML = ""; this.attach(j); toast("Started " + kind) }
     catch (e) { toast(e.message, true) }
@@ -143,7 +279,7 @@ const Explorer = {
       api("/api/library").then(l => { Explorer.libNames = l.names }).catch(() => { });
       $("#boxToggle").onchange = () => this.view.draw(); $("#refreshLayers").onclick = () => { this.loaded = false; this.init() };
       $$("#specMode button").forEach(b => b.onclick = () => { $$("#specMode button").forEach(x => x.classList.toggle("on", x === b)); this.mode = b.dataset.m; this.plot() });
-      api("/api/boxes").then(b => { this.boxes = b.boxes; this.view.draw() });
+      api("/api/boxes").then(b => { this.boxes = b.boxes; window._boxes = b.boxes; this.view.draw() });
       window.addEventListener("resize", () => this.plot());
     }
     if (this.loaded) return; this.loaded = true;
@@ -169,7 +305,7 @@ const Explorer = {
     let h = "";
     if (l.type === "multi") { const k = l.shape[2], opt = v => [...Array(k).keys()].map(i => `<option value="${i}" ${i === v ? "selected" : ""}>C${i + 1}</option>`).join(""); h += `<label>Mode<select id="cMode"><option value="rgb">RGB composite</option>${[...Array(k).keys()].map(i => `<option value="${i}" ${o.component === i ? "selected" : ""}>Single · C${i + 1}</option>`).join("")}</select></label>`; if (o.component == null) h += `<div class="rgbsel"><label>R<select id="cR">${opt(o.r)}</select></label><label>G<select id="cG">${opt(o.g)}</select></label><label>B<select id="cB">${opt(o.b)}</select></label></div>` }
     if (l.type !== "labels") { h += `<label>Low percentile <span class="mono">${o.lo}%</span><input type="range" id="cLo" min="0" max="49" step="0.5" value="${o.lo}"></label><label>High percentile <span class="mono">${o.hi}%</span><input type="range" id="cHi" min="51" max="100" step="0.5" value="${o.hi}"></label>`; if (l.type === "scalar" || o.component != null) h += `<label>Colormap<select id="cMap">${CMAPS.map(c => `<option ${c === o.cmap ? "selected" : ""}>${c}</option>`).join("")}</select></label>` }
-    h += `<a class="small" href="${fileUrl(l.file, 1)}">Download .npy</a>`;
+    if (!window.STATIC) h += `<a class="small" href="${fileUrl(l.file, 1)}">Download .npy</a>`;
     $("#ctrlBody").innerHTML = h; $("#cMode") && ($("#cMode").value = o.component == null ? "rgb" : o.component);
     const upd = () => { if ($("#cMode")) o.component = $("#cMode").value === "rgb" ? null : +$("#cMode").value; ["r", "g", "b"].forEach(c => { const e = $("#c" + c.toUpperCase()); if (e) o[c] = +e.value }); if ($("#cLo")) { o.lo = +$("#cLo").value; o.hi = +$("#cHi").value } if ($("#cMap")) o.cmap = $("#cMap").value; this.render() };
     $$("#ctrlBody select").forEach(s => s.onchange = () => { upd(); this.ctrls() });
@@ -185,8 +321,19 @@ const Explorer = {
       if (l.type === "figure") { this.view.coords = false; this.view.set(await loadImg(fileUrl(l.file)), false); $("#exLegend").innerHTML = ""; return }
       this.view.coords = true;
       const q = new URLSearchParams({ path: l.file, r: o.r, g: o.g, b: o.b, lo: o.lo, hi: o.hi, cmap: o.cmap }); if (o.component != null) q.set("component", o.component);
-      const r = await fetch("/api/render?" + q); if (!r.ok) throw new Error((await r.json()).detail);
-      const meta = JSON.parse(r.headers.get("X-Meta") || "{}"); const bmp = await createImageBitmap(await r.blob());
+      let meta = {}, bmp;
+      if (window.STATIC) {
+        const info = renderUrl(q);
+        let src = info.url;
+        try { bmp = await loadImg(src); } catch (e) { if (info.fallback) { src = info.fallback; bmp = await loadImg(src); } else throw e }
+        const idx = await renderIndex();
+        const ent = idx[(l.file || "").replace(/\\/g, "/")] || {};
+        const k = (o.component != null ? ("c" + o.component) : ("rgb" + o.r + o.g + o.b)) + "|" + (o.cmap || "viridis") + "|" + nearestStretch(o.lo) + "-" + (100 - nearestStretch(o.lo));
+        meta = (ent[k] && ent[k].meta) || {};
+      } else {
+        const r = await fetch("/api/render?" + q); if (!r.ok) throw new Error((await r.json()).detail);
+        meta = JSON.parse(r.headers.get("X-Meta") || "{}"); bmp = await createImageBitmap(await r.blob());
+      }
       this.view.set(bmp, keep && this.shown === l.shape?.slice(0, 2).join()); this.shown = l.shape?.slice(0, 2).join();
       const lg = $("#exLegend");
       if (meta.labels) { lg.innerHTML = `<div class="fh" style="margin-top:8px">Labels</div>` + meta.labels.map(v => `<div class="chip" style="padding:3px 4px"><span class="sw" style="background:${meta.palette[v % meta.palette.length]}"></span><span class="nm">${v}${Explorer.libNames && Explorer.libNames[v] ? " · " + Explorer.libNames[v] : ""}</span></div>`).join("") }
@@ -247,7 +394,7 @@ const L2B = {
     }
     if (this.loaded) return; this.loaded = true; $("#l2bEmpty").classList.add("show");
     try {
-      const [s, buf] = await Promise.all([api("/api/l2b/summary"), fetch("/api/l2b/ids.bin").then(r => r.arrayBuffer())]);
+      const [s, buf] = await Promise.all([api("/api/l2b/summary"), fetch(window.STATIC ? "api/l2b/ids.bin" : "/api/l2b/ids.bin").then(r => { if (!r.ok) throw new Error("L2B ids missing"); return r.arrayBuffer(); })]);
       this.sum = s; this.recolor(s); this.ids = new Int16Array(buf); this.byId = {}; s.classes.forEach(c => this.byId[c.id] = c);
       this.vis = new Set(s.classes.filter(c => c.id).map(c => c.id));
       this.cv = document.createElement("canvas"); this.cv.width = s.shape[1]; this.cv.height = s.shape[0];
@@ -286,7 +433,7 @@ const Runs = {
       <div><b>${esc(r.kind)}</b> <span class="muted small">· ${fmtT(r.runtime)} · exit ${r.exit_code ?? "—"} · ${esc(r.out_dir)} · ${r.images.length} images</span><div class="cmd">${esc(r.command)}</div></div>
       <div class="acts"><button class="btn sm ghost" data-log="${r.id}">Log</button><button class="btn sm" data-out="${r.id}">Outputs</button></div></div>`).join("")
       : `<div class="emptybox">No runs yet. Launch one from the <a data-goto="run">Run</a> tab — each run is saved to webapp\\runs\\ with its command, exit code, runtime and log.</div>`;
-    $$("[data-log]").forEach(b => b.onclick = async () => { const t = await (await fetch(`/api/runs/${b.dataset.log}/log`)).text(); go("run"); $("#termTitle").textContent = b.dataset.log + ".log"; $("#term").textContent = t });
+    $$("[data-log]").forEach(b => b.onclick = async () => { const url = window.STATIC ? "api/runs/" + b.dataset.log + ".log" : `/api/runs/${b.dataset.log}/log`; const t = await (await fetch(url)).text(); go("run"); $("#termTitle").textContent = b.dataset.log + ".log"; $("#term").textContent = t });
     $$("[data-out]").forEach(b => b.onclick = () => this.gallery(this.runs.find(r => r.id === b.dataset.out)));
     const opts = [...this.runs.filter(r => r.images.length).map(r => [r.id, `${r.kind} · ${new Date(r.started * 1000).toLocaleString()}`, r.out_dir]), ...(await api("/api/outputs/dirs").catch(() => [])).map(d => ["dir:" + d.dir, "current " + d.dir, d.dir])];
     this.opts = opts; const o = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
@@ -428,7 +575,7 @@ const Pipeline = {
 /* ---------------- SCORES ---------------- */
 const Scores = {
   loaded: false, dir: "outputs", pc: 0, mf: null,
-  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); return "/api/render?" + q },
+  url(path, o) { const s = +$("#scStretch").value; const q = new URLSearchParams({ path, lo: s, hi: 100 - s, cmap: o.cmap }); if (o.component != null) q.set("component", o.component); if (!window.STATIC) return "/api/render?" + q; const info = renderUrl(q); return info.url; },
   async init() {
     if (!this.bound) { this.bound = true; $("#scStretch").onchange = () => this.draw(true); $("#scStretch").oninput = () => $("#scStretchLbl").textContent = `${$("#scStretch").value}–${100 - $("#scStretch").value}%`; $("#scCmap").onchange = () => this.draw(true); $("#mfBigSel").onchange = () => { this.mf = $("#mfBigSel").value; this.draw() } }
     if (this.loaded) return; this.loaded = true;
@@ -446,12 +593,12 @@ const Scores = {
   },
   draw(all) {
     const cm = $("#scCmap").value;
-    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
+    if (this.pca) { $("#pcBig").innerHTML = `<img src="${this.url(this.pca.file, { cmap: "gray", component: this.pc })}" data-fb="files/outputs/pca_rgb.png" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}">`; $("#pcCap").textContent = `PC${this.pc + 1} of ${this.pca.shape[2]} · ${this.pca.file}`; $$("#pcBtns button").forEach(b => b.classList.toggle("on", +b.dataset.i === this.pc)) } else $("#pcBig").innerHTML = '<span class="muted">No pca_scores.npy in this folder yet.</span>';
     const m = this.mfs.find(x => x.label === this.mf);
-    if (m) { $("#mfBig").innerHTML = `<img src="${this.url(m.file, { cmap: cm })}">`; $("#mfCap").textContent = `${m.label} · ${m.file}`; $("#mfBigSel").value = m.label } else $("#mfBig").innerHTML = '<span class="muted">No matched-filter maps yet.</span>';
+    if (m) { const fb = figureFallback(m.file); $("#mfBig").innerHTML = `<img src="${this.url(m.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}>`; $("#mfCap").textContent = `${m.label} · ${m.file}`; $("#mfBigSel").value = m.label } else $("#mfBig").innerHTML = '<span class="muted">No matched-filter maps yet.</span>';
     if (all) {
-      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
-      $("#mfThumbs").innerHTML = this.mfs.length ? this.mfs.map(x => `<div class="th" data-n="${esc(x.label)}"><img loading="lazy" src="${this.url(x.file, { cmap: cm })}"><span>${esc(x.label)}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
+      $("#pcThumbs").innerHTML = this.pca ? [...Array(this.pca.shape[2]).keys()].map(i => `<div class="th" data-i="${i}"><img loading="lazy" src="${this.url(this.pca.file, { cmap: "gray", component: i })}" data-fb="files/outputs/pca_rgb.png" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"><span>PC${i + 1}</span></div>`).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
+      $("#mfThumbs").innerHTML = this.mfs.length ? this.mfs.map(x => { const fb = figureFallback(x.file); return `<div class="th" data-n="${esc(x.label)}"><img loading="lazy" src="${this.url(x.file, { cmap: cm })}" ${fb ? `data-fb="${fb}" onerror="if(this.dataset.fb){this.onerror=null;this.src=this.dataset.fb}"` : ""}><span>${esc(x.label)}</span></div>`; }).join("") : '<div class="emptybox">No outputs yet — run the pipeline.</div>';
       $$("#pcThumbs .th").forEach(t => t.onclick = () => { this.pc = +t.dataset.i; this.draw(); window.scrollTo({ top: $("#pcBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
       $$("#mfThumbs .th").forEach(t => t.onclick = () => { this.mf = t.dataset.n; this.draw(); window.scrollTo({ top: $("#mfBig").getBoundingClientRect().top + scrollY - 120, behavior: "smooth" }) });
     }
@@ -460,6 +607,32 @@ const Scores = {
 };
 
 /* ---------------- boot ---------------- */
-Run.init(); loadStatus(); setInterval(loadStatus, 15000);
-api("/api/jobs/current").then(j => j && Run.attach(j)).catch(() => { });
-go((location.hash || "#run").slice(1) in pages ? (location.hash || "#run").slice(1) : "run");
+async function boot() {
+  await detectStatic();
+  if (window.STATIC) {
+    applyStaticUI();
+    try {
+      const t = await (await fetch("api/runs/full-013-cli.log")).text();
+      const term = $("#term");
+      if (term && (!term.textContent || term.textContent.includes("ready"))) {
+        $("#termTitle").textContent = "full 013 scene · completed run";
+        term.textContent = t;
+        const facts = await api("/api/pipeline/facts?dir=outputs").catch(() => null);
+        if (facts && facts.done) {
+          $("#elapsed").textContent = fmtT(facts.done[0]);
+          $("#phase").textContent = `Completed in ${facts.done[0]} s · peak ${fmtN(facts.done[1])} MB · read-only showcase`;
+          $("#progBar").style.width = "100%";
+        }
+      }
+    } catch (e) { }
+  }
+  Run.init();
+  loadStatus();
+  if (!window.STATIC) {
+    setInterval(loadStatus, 15000);
+    api("/api/jobs/current").then(j => j && Run.attach(j)).catch(() => { });
+  }
+  const def = window.STATIC ? "pipeline" : "run";
+  go((location.hash || ("#" + def)).slice(1) in pages ? (location.hash || ("#" + def)).slice(1) : def);
+}
+boot();

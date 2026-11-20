@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Oman Ophiolite · EMIT Mineral Mapping</title>
-<link rel="stylesheet" href="/static/app.css">
+<title>Serpentine Signals</title>
+<link rel="stylesheet" href="static/app.css">
 </head>
 <body>
 <header class="topbar">
   <div class="wrap topbar-in">
-    <div class="wordmark">EMIT <span>Oman</span></div>
+    <div class="wordmark">Serpentine <span>Signals</span></div>
     <nav>
       <a data-page="run" class="active">Run</a>
       <a data-page="pipeline">Pipeline</a>
@@ -28,9 +28,10 @@
 <main class="wrap">
   <section class="hero">
     <div class="eyebrow">EMIT L2A reflectance · 20 February 2026 · granule 2605105_013</div>
-    <h1>Oman Ophiolite · EMIT Mineral Mapping</h1>
-    <p class="lede">Streaming PCA, MNF, matched filter and spectral-angle mapping over the Samail ophiolite, alongside the EMIT L2B mineral product.</p>
+    <h1>Serpentine Signals</h1>
+    <p class="lede">Streaming Hyperspectral Mapping of Carbon-Storage Minerals in the Samail Ophiolite with NASA EMIT</p>
     <div class="stats" id="stats"></div>
+    <div class="static-note" id="staticNote" hidden>This is a read-only showcase of a completed run. Launching the pipeline requires the local app on your machine.</div>
   </section>
 
   <!-- RUN -->
@@ -166,10 +167,10 @@
       <div id="cmpView" class="cmpview"></div></div>
     <div class="card"><div class="card-h"><h2 id="galTitle">Outputs</h2><span class="muted small" id="galSub"></span></div><div id="gallery" class="gallery"></div></div>
   </section>
-  <footer class="foot muted small">Local dashboard · served on 127.0.0.1 · data stays on this machine</footer>
+  <footer class="foot muted small" id="siteFoot">Local dashboard · served on 127.0.0.1 · data stays on this machine</footer>
 </main>
 <div id="lightbox" class="lightbox"><img><div class="lb-cap"></div></div>
 <div id="toast" class="toast"></div>
-<script src="/static/app.js"></script>
+<script src="static/app.js"></script>
 </body>
 </html>

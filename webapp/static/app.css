@@ -241,3 +241,32 @@ body:not([data-page=run]) .hero{padding:30px 0 22px;margin-bottom:28px}
 body:not([data-page=run]) .hero h1{font-size:34px;letter-spacing:-.8px}
 body:not([data-page=run]) .hero .lede{display:none}
 body:not([data-page=run]) .hero .stats{margin-top:14px}
+
+/* static showcase + mobile */
+.static-note{display:none;margin-top:18px;padding:12px 16px;border:1px solid var(--line2);background:var(--accent-soft);border-radius:8px;color:var(--ink2);font-size:13.5px;max-width:720px}
+body.static .static-note, .static-note:not([hidden]){display:block}
+body.static .tile, body.static .tile.primary{opacity:.45;pointer-events:none}
+body.static .adv, body.static .form, body.static .cmdprev{opacity:.7}
+@media (max-width:700px){
+  .wrap{padding:0 14px}
+  .topbar-in{flex-wrap:wrap;height:auto;min-height:52px;gap:6px 16px;padding:8px 0 0}
+  .wordmark{font-size:17px}
+  nav{gap:14px;flex-wrap:wrap;width:100%;order:3;border-top:1px solid var(--line);padding:0}
+  nav a{padding:10px 0;font-size:13.5px}
+  .topbar-r{margin-left:auto}
+  h1{font-size:28px;letter-spacing:-.6px}
+  body:not([data-page=run]) .hero h1{font-size:26px}
+  .lede{font-size:15.5px}
+  .hero{padding:28px 0 20px;margin-bottom:22px}
+  .stats{gap:14px 18px}
+  .tiles{grid-template-columns:1fr}
+  .console-card{min-height:280px}
+  .kpis{grid-template-columns:1fr 1fr;gap:10px}
+  .charts,.detail,.two-eq,.run-grid,.two,.map-grid{grid-template-columns:1fr}
+  .mapwrap,.mapwrap.tall{min-height:360px;height:70vw}
+  .side-panel{order:2}
+  .card{padding:16px 16px}
+  .scores-bar{gap:14px}
+  .thumbs{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  .term{font-size:11px}
+}
