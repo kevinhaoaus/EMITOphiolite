@@ -1,0 +1,14 @@
+__pycache__/
+.venv/
+outputs/
+*.nc
+.idea/
+data/raw/*.nc
+
+data/
+.pytest_cache/
+webapp/runs/
+*.npy
+*.h5
+.env
+*.pyc

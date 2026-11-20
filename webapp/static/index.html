@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oman Ophiolite · EMIT Mineral Mapping</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="wordmark">EMIT <span>Oman</span></div>
+    <nav>
+      <a data-page="run" class="active">Run</a>
+      <a data-page="pipeline">Pipeline</a>
+      <a data-page="explorer">Map</a>
+      <a data-page="scores">Scores</a>
+      <a data-page="l2b">Minerals</a>
+      <a data-page="runs">Runs</a>
+    </nav>
+    <div class="topbar-r">
+      <div id="jobPill" class="pill idle"><span class="dot"></span><span id="jobPillText">idle</span></div>
+      <span class="muted small" id="pyver"></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="eyebrow">EMIT L2A reflectance · 20 February 2026 · granule 2605105_013</div>
+    <h1>Oman Ophiolite · EMIT Mineral Mapping</h1>
+    <p class="lede">Streaming PCA, MNF, matched filter and spectral-angle mapping over the Samail ophiolite, alongside the EMIT L2B mineral product.</p>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <!-- RUN -->
+  <section class="page active" id="page-run">
+    <div class="grid run-grid">
+      <div class="card">
+        <div class="card-h"><h2>Launch</h2><span class="muted small">one job at a time · py -3.11</span></div>
+        <div class="tiles">
+          <button class="tile" data-kind="tests"><b>Run tests</b><span>pytest tests</span></button>
+          <button class="tile" data-kind="smoke"><b>Smoke run</b><span>first <i id="smokeRowsLbl">256</i> rows → outputs\subset</span></button>
+          <button class="tile primary" data-kind="full"><b>Full 013 scene</b><span>1280 × 1242 · exclude boxes · 8 components</span></button>
+          <button class="tile" data-kind="quicklook"><b>L2B quicklook</b><span>emit_l2b_mineral_map.png</span></button>
+        </div>
+        <div class="card-h sub"><h3>Parameters</h3><span class="muted small" id="flagsInfo">reading pipeline --help…</span></div>
+        <div class="form">
+          <label>Components<input type="number" id="pComponents" value="8" min="1" max="32"></label>
+          <label>Max fit pixels<input type="number" id="pMaxFit" value="80000" step="5000"></label>
+          <label>Chunk rows<input type="number" id="pChunk" value="128" step="16"></label>
+          <label>Smoke rows<input type="number" id="pSmokeRows" value="256" step="64"></label>
+          <label>Output dir<input type="text" id="pOut" placeholder="auto"></label>
+          <label class="switch"><input type="checkbox" id="pBoxes" checked><span class="sl"></span>Exclude boxes (22)</label>
+        </div>
+        <details class="adv"><summary>Advanced — flags detected in pipeline.py</summary><div id="advFlags" class="form"></div><pre id="helpText" class="help"></pre></details>
+        <div class="cmdprev"><span class="label">Command preview</span><code id="cmdPreview">—</code></div>
+      </div>
+
+      <div class="card console-card">
+        <div class="term-h">
+          <div class="term-title" id="termTitle">Console</div>
+          <div class="term-right"><span id="elapsed" class="mono">00:00</span>
+            <label class="mini"><input type="checkbox" id="autoscroll" checked> follow</label>
+            <button class="btn sm" id="stopBtn" disabled>Stop</button></div>
+        </div>
+        <div class="progress"><div class="bar" id="progBar"></div></div>
+        <div class="phase"><span id="phase" class="muted small">No job running. Choose an action on the left.</span><span id="progPct" class="mono small"></span></div>
+        <pre class="term" id="term"><span class="muted">$ ready</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- PIPELINE -->
+  <section class="page" id="page-pipeline">
+    <div class="kpis" id="kpis"></div>
+    <div class="card">
+      <div class="card-h"><h2>How the pipeline works</h2><span class="muted small" id="pipeSrc">select a step</span></div>
+      <div class="diagram" id="diagram"></div>
+      <div class="detail" id="stepDetail"></div>
+    </div>
+    <div class="grid charts">
+      <div class="card"><div class="card-h"><h3>PCA explained variance</h3><span class="muted small">pca_explained.txt</span></div><div class="chart" id="chPca"></div></div>
+      <div class="card"><div class="card-h"><h3>MNF eigenvalues</h3><span class="muted small">signal-to-noise per component</span></div><div class="chart" id="chMnf"></div></div>
+      <div class="card"><div class="card-h"><h3>Matched-filter score distribution</h3><select id="mfSel"></select></div><div class="chart" id="chMf"></div><div class="muted small" id="mfInfo"></div></div>
+      <div class="card"><div class="card-h"><h3>SAM label area</h3><span class="muted small">share of prepared pixels per best-match mineral</span></div><div class="chart" id="chSam"></div></div>
+      <div class="card"><div class="card-h"><h3>SAM angle distribution</h3><span class="muted small">radians · threshold 0.12</span></div><div class="chart" id="chAng"></div><div class="muted small" id="angInfo"></div></div>
+      <div class="card"><div class="card-h"><h3>Pass 2 chunks</h3><span class="muted small">prepared pixels and time per 128-row chunk</span></div><div class="chart" id="chChunks"></div></div>
+    </div>
+  </section>
+
+  <!-- SCORES -->
+  <section class="page" id="page-scores">
+    <div class="card scores-bar">
+      <div class="seg small" id="scDir"></div>
+      <label class="inl">Stretch <span class="mono" id="scStretchLbl">2–98%</span><input type="range" id="scStretch" min="0" max="10" step="0.5" value="2"></label>
+      <label class="inl">MF colormap<select id="scCmap"><option>viridis</option><option>magma</option><option>cividis</option><option>gray</option><option>RdBu_r</option></select></label>
+    </div>
+    <div class="grid two-eq">
+      <div class="card"><div class="card-h"><h2>Principal components</h2><div class="seg small" id="pcBtns"></div></div><div class="bigimg" id="pcBig"></div><div class="muted small" id="pcCap"></div></div>
+      <div class="card"><div class="card-h"><h2>Matched filter</h2><select id="mfBigSel"></select></div><div class="bigimg" id="mfBig"></div><div class="muted small" id="mfCap"></div></div>
+    </div>
+    <div class="card"><div class="card-h"><h3>All components</h3><span class="muted small">grayscale, independent percentile stretch</span></div><div class="thumbs" id="pcThumbs"></div></div>
+    <div class="card"><div class="card-h"><h3>All matched-filter scores</h3><span class="muted small">score = (t−m)ᵀΣ⁻¹(x−m) / (t−m)ᵀΣ⁻¹(t−m), unclipped</span></div><div class="thumbs" id="mfThumbs"></div></div>
+  </section>
+
+  <!-- MAP -->
+  <section class="page" id="page-explorer">
+    <div class="grid map-grid">
+      <div class="mapwrap" id="exMap">
+        <canvas class="mapcanvas"></canvas>
+        <div class="readout mono" id="exReadout">hover the map</div>
+        <div class="scalebar"><div class="sb" id="exScale"></div><span id="exScaleLbl"></span></div>
+        <canvas class="minimap" id="exMini" width="150" height="150"></canvas>
+        <div class="empty" id="exEmpty"><h3>No outputs yet</h3><p>Run the pipeline from the <a data-goto="run">Run</a> page. Score maps and figures appear here automatically.</p></div>
+      </div>
+      <aside class="card side-panel">
+        <div class="sec"><div class="sec-h">Output folder <button class="link" id="refreshLayers">Refresh</button></div><div class="seg" id="dirSeg"></div><div class="muted small" id="layerCount"></div></div>
+        <div class="sec"><div class="sec-h">Layers</div><div id="layerList" class="layerlist"></div></div>
+        <div class="sec"><div class="sec-h">Display</div><div id="ctrlBody"></div></div>
+        <div class="sec"><div class="sec-h">Overlay</div><label class="switch"><input type="checkbox" id="boxToggle"><span class="sl"></span>Exclude boxes</label></div>
+        <div class="sec"><div class="sec-h">Legend</div><div class="legend" id="exLegend"><span class="muted small">—</span></div></div>
+      </aside>
+    </div>
+    <div class="grid two">
+      <div class="card"><div class="card-h"><h2>Pixel</h2><span class="muted small" id="pxHead">click a map pixel</span></div><div id="pxTable" class="pxtable muted small">Map layers (.npy) report values at the cursor. Click to pin a pixel and load its spectrum.</div></div>
+      <div class="card"><div class="card-h"><h2>Spectrum</h2>
+        <div class="seg small" id="specMode"><button data-m="cr" class="on">Continuum removed</button><button data-m="raw">Reflectance</button></div></div>
+        <canvas id="specPlot" class="plot"></canvas>
+        <div id="specMatches" class="matches"></div></div>
+    </div>
+  </section>
+
+  <!-- MINERALS -->
+  <section class="page" id="page-l2b">
+    <div class="grid map-grid">
+      <div class="mapwrap tall" id="l2bMap">
+        <canvas class="mapcanvas"></canvas>
+        <div class="readout mono" id="l2bReadout">hover the map</div>
+        <div class="scalebar"><div class="sb" id="l2bScale"></div><span id="l2bScaleLbl"></span></div>
+        <canvas class="minimap" id="l2bMini" width="150" height="150"></canvas>
+        <div class="empty" id="l2bEmpty"><div class="spinner"></div><h3>Loading L2B mineral ids…</h3></div>
+      </div>
+      <aside class="card side-panel legend-card">
+        <div class="sec"><div class="sec-h">Mineral classes</div><div class="seg small"><button id="l2bAll">All</button><button id="l2bTop">Top 12</button><button id="l2bNone">None</button></div>
+        <div class="muted small" id="l2bInfo" style="margin-top:10px"></div>
+        <label class="switch"><input type="checkbox" id="l2bShow0"><span class="sl"></span>Show unclassified (id 0)</label></div>
+        <div id="l2bLegend" class="chips"></div>
+      </aside>
+    </div>
+    <div class="card"><div class="card-h"><h2>Pixel counts</h2><span class="muted small">names joined where mineral_metadata/index == id</span></div>
+      <div class="tablewrap"><table class="tbl" id="l2bTable"></table></div></div>
+  </section>
+
+  <!-- RUNS -->
+  <section class="page" id="page-runs">
+    <div class="card"><div class="card-h"><h2>Run history</h2><button class="btn sm" id="refreshRuns">Refresh</button></div>
+      <div id="runList" class="runlist"></div></div>
+    <div class="card"><div class="card-h"><h2>Compare</h2><span class="muted small">drag the divider to swipe between two outputs</span></div>
+      <div class="form cmpform">
+        <label>Run A<select id="cmpA"></select></label>
+        <label>Run B<select id="cmpB"></select></label>
+        <label>Image<select id="cmpImg"></select></label>
+        <div class="seg small" id="cmpMode"><button data-m="swipe" class="on">Swipe</button><button data-m="side">Side by side</button></div>
+      </div>
+      <div id="cmpView" class="cmpview"></div></div>
+    <div class="card"><div class="card-h"><h2 id="galTitle">Outputs</h2><span class="muted small" id="galSub"></span></div><div id="gallery" class="gallery"></div></div>
+  </section>
+  <footer class="foot muted small">Local dashboard · served on 127.0.0.1 · data stays on this machine</footer>
+</main>
+<div id="lightbox" class="lightbox"><img><div class="lb-cap"></div></div>
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
