@@ -107,10 +107,11 @@ function figureFallback(path) {
   const rel = (path || "").replace(/\\/g, "/");
   const stem = rel.split("/").pop().replace(/\.npy$/, "");
   if (!stem) return null;
-  if (stem === "pca_scores") return assetUrl("files/outputs/pca_rgb.jpg");
-  if (stem === "mnf_scores") return assetUrl("files/outputs/mnf_rgb.jpg");
-  const figure = "files/" + rel.replace(/\/maps\//, "/").replace(/\.npy$/, ".jpg");
-  return assetUrl(figure);
+  const folder = rel.includes("/subset/") ? "files/outputs/subset/" : "files/outputs/";
+  if (stem === "pca_scores") return assetUrl(folder + "pca_rgb.jpg");
+  if (stem === "mnf_scores") return assetUrl(folder + "mnf_rgb.jpg");
+  if (stem.startsWith("window_") && stem.endsWith("_pca")) return assetUrl(folder + stem + "_rgb.jpg");
+  return assetUrl(folder + stem + ".jpg");
 }
 let _pixelGrid = null;
 async function pixelFromGrid(row, col, dir) {
@@ -138,10 +139,12 @@ function applyStaticUI() {
   const note = document.getElementById("staticNote");
   if (note) note.hidden = false;
   const foot = document.getElementById("siteFoot");
-  if (foot) foot.textContent = "Read-only showcase · github.com/kevinhaoaus/EMITOphiolite · run the pipeline locally to generate new maps";
+  if (foot) foot.textContent = "Finished map of one NASA pass over Oman · a bright pixel is a mineral match, not a tonne of stored CO₂ · github.com/kevinhaoaus/EMITOphiolite";
   const pill = document.getElementById("jobPillText");
   if (pill) pill.textContent = "showcase";
   document.getElementById("jobPill")?.classList.add("success");
+  const runLink = document.querySelector('nav a[data-page="run"]');
+  if (runLink) runLink.textContent = "Run log";
   $$(".tile").forEach(t => { t.classList.add("disabled"); t.onclick = ev => { ev.preventDefault(); toast(STATIC_MSG, true) }; t.onmouseenter = null; });
   const stop = document.getElementById("stopBtn");
   if (stop) stop.disabled = true;
@@ -173,9 +176,9 @@ async function loadStatus() {
   try {
     const s = await api("/api/status"); const sc = s.scene || {};
     $("#stats").innerHTML = [
-      [sc.shape ? sc.shape.slice(0, 2).join(" × ") : "—", "scene px"], [sc.shape ? sc.shape[2] : "—", "bands"],
-      [sc.good_bands ?? "—", "good bands"], [s.boxes, "exclude boxes"],
-      [s.outputs.reduce((a, d) => a + d.png, 0), "PNG outputs"]].map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("");
+      [sc.shape ? sc.shape.slice(0, 2).join(" × ") : "—", "pixels in this scene"], [sc.shape ? sc.shape[2] : "—", "wavelengths"],
+      [sc.good_bands ?? "—", "usable wavelengths"], [s.boxes, "masked patches"],
+      [s.outputs.reduce((a, d) => a + d.png, 0), "maps"]].map(([b, l]) => `<div class="stat"><b>${b}</b><span>${l}</span></div>`).join("");
     $("#pyver").textContent = (window.STATIC ? "GitHub Pages · read-only" : "server · python " + s.python);
     if (s.job && s.job.state === "running" && !Run.job) Run.attach(s.job);
   } catch (e) { $("#stats").innerHTML = `<div class="stat"><b>offline</b><span>${esc(e.message)}</span></div>` }
@@ -344,12 +347,19 @@ const Explorer = {
       let meta = {}, bmp;
       if (window.STATIC) {
         const info = renderUrl(q);
-        let src = info.url;
-        try { bmp = await loadImg(src); } catch (e) { if (info.fallback) { src = info.fallback; bmp = await loadImg(src); } else throw e }
         const idx = await renderIndex();
-        const ent = idx[(l.file || "").replace(/\\/g, "/")] || {};
-        const k = (o.component != null ? ("c" + o.component) : ("rgb" + o.r + o.g + o.b)) + "|" + (o.cmap || "viridis") + "|" + nearestStretch(o.lo) + "-" + (100 - nearestStretch(o.lo));
-        meta = (ent[k] && ent[k].meta) || {};
+        const rel = (l.file || "").replace(/\\/g, "/");
+        const ent = idx[rel] || {};
+        const stretch = nearestStretch(o.lo) + "-" + (100 - nearestStretch(o.lo));
+        const k = (o.component != null ? ("c" + o.component) : ("rgb" + o.r + o.g + o.b)) + "|" + (o.cmap || "viridis") + "|" + stretch;
+        const rgbKey = "rgb" + o.r + o.g + o.b + "|viridis|" + stretch;
+        const candidates = [ent[k] && ent[k].file, ent[rgbKey] && ent[rgbKey].file, ent.figure && ent.figure.file].filter(Boolean).map(assetUrl).concat([info.url, info.fallback]).filter(Boolean);
+        let loaded = false;
+        for (const src of [...new Set(candidates)]) {
+          try { bmp = await loadImg(src); loaded = true; break; } catch (e) { }
+        }
+        if (!loaded) throw new Error("That map image is not in the showcase");
+        meta = (ent[k] && ent[k].meta) || (ent[rgbKey] && ent[rgbKey].meta) || {};
       } else {
         const r = await fetch("/api/render?" + q); if (!r.ok) throw new Error((await r.json()).detail);
         meta = JSON.parse(r.headers.get("X-Meta") || "{}"); bmp = await createImageBitmap(await r.blob());
@@ -449,13 +459,14 @@ const Runs = {
     if (this.loaded) return; this.loaded = true;
     this.runs = await api("/api/runs").catch(() => []);
     const rl = $("#runList");
-    rl.innerHTML = this.runs.length ? this.runs.map(r => `<div class="run"><div><span class="badge ${r.state}">${r.state}</span><div class="muted small" style="margin-top:6px">${new Date(r.started * 1000).toLocaleString()}</div></div>
-      <div><b>${esc(r.kind)}</b> <span class="muted small">· ${fmtT(r.runtime)} · exit ${r.exit_code ?? "—"} · ${esc(r.out_dir)} · ${r.images.length} images</span><div class="cmd">${esc(r.command)}</div></div>
+    const when = r => r.started ? new Date(r.started * 1000).toLocaleString() : "completed scene";
+    rl.innerHTML = this.runs.length ? this.runs.map(r => `<div class="run"><div><span class="badge ${r.state}">${r.state}</span><div class="muted small" style="margin-top:6px">${when(r)}</div></div>
+      <div><b>${esc(r.kind)}</b> <span class="muted small">· ${fmtT(r.runtime)} · exit ${r.exit_code ?? "—"} · ${esc(r.out_dir)} · ${(r.images || []).length} images</span><div class="cmd">${esc(r.command)}</div></div>
       <div class="acts"><button class="btn sm ghost" data-log="${r.id}">Log</button><button class="btn sm" data-out="${r.id}">Outputs</button></div></div>`).join("")
       : `<div class="emptybox">No runs yet. Launch one from the <a data-goto="run">Run</a> tab — each run is saved to webapp\\runs\\ with its command, exit code, runtime and log.</div>`;
     $$("[data-log]").forEach(b => b.onclick = async () => { const url = window.STATIC ? assetUrl("api/runs/" + b.dataset.log + ".log") : `/api/runs/${b.dataset.log}/log`; const t = await (await fetch(url)).text(); go("run"); $("#termTitle").textContent = b.dataset.log + ".log"; $("#term").textContent = t });
     $$("[data-out]").forEach(b => b.onclick = () => this.gallery(this.runs.find(r => r.id === b.dataset.out)));
-    const opts = [...this.runs.filter(r => r.images.length).map(r => [r.id, `${r.kind} · ${new Date(r.started * 1000).toLocaleString()}`, r.out_dir]), ...(await api("/api/outputs/dirs").catch(() => [])).map(d => ["dir:" + d.dir, "current " + d.dir, d.dir])];
+    const opts = [...this.runs.filter(r => (r.images || []).length).map(r => [r.id, `${r.kind} · ${when(r)}`, r.out_dir]), ...(await api("/api/outputs/dirs").catch(() => [])).map(d => ["dir:" + d.dir, "current " + d.dir, d.dir])];
     this.opts = opts; const o = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
     $("#cmpA").innerHTML = o; $("#cmpB").innerHTML = o; if (opts.length > 1) $("#cmpB").selectedIndex = 1;
     ["#cmpA", "#cmpB"].forEach(s => $(s).onchange = () => this.cmpImgs()); $("#cmpImg").onchange = () => this.compare();
@@ -463,14 +474,15 @@ const Runs = {
     $("#refreshRuns").onclick = () => { this.loaded = false; this.load() };
     this.cmpImgs();
     const dirs = await api("/api/outputs/dirs").catch(() => []);
-    this.gallery(this.runs.find(r => r.images.length) || (dirs[0] && { id: null, out_dir: dirs[0].dir }));
+    this.gallery(this.runs.find(r => (r.images || []).length) || (dirs[0] && { id: null, out_dir: dirs[0].dir }));
   },
   dirOf(v) { const o = this.opts.find(x => x[0] === v); return o ? o[2] : null },
-  async imgs(dir) { const L = await api("/api/layers?dir=" + encodeURIComponent(dir)).catch(() => ({ layers: [] })); return L.layers.filter(l => l.type === "figure") },
+  async imgs(dir) { const L = await api("/api/layers?dir=" + encodeURIComponent(dir)).catch(() => ({ layers: [] })); return (L.layers || []).filter(l => l.type === "figure" && !/deck_usgs_spectra/.test(l.file || "")); },
   async cmpImgs() {
     const a = this.dirOf($("#cmpA").value), b = this.dirOf($("#cmpB").value); if (!a || !b) { $("#cmpView").innerHTML = '<div class="emptybox">Nothing to compare yet — run the smoke and full pipeline first.</div>'; return }
     const [A, B] = await Promise.all([this.imgs(a), this.imgs(b)]); const nb = new Set(B.map(x => x.file.split("/").pop()));
-    const common = A.map(x => x.file.split("/").pop()).filter(n => nb.has(n));
+    const rank = n => n.startsWith("pca_rgb") ? 0 : n.startsWith("mnf_rgb") ? 1 : n.startsWith("window_") ? 2 : 3;
+    const common = A.map(x => x.file.split("/").pop()).filter(n => nb.has(n)).sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
     $("#cmpImg").innerHTML = common.map(n => `<option>${esc(n)}</option>`).join(""); this.compare();
   },
   compare() {
@@ -488,8 +500,12 @@ const Runs = {
     if (!r) { $("#gallery").innerHTML = '<div class="emptybox">No outputs yet — run the pipeline.</div>'; return }
     $("#galTitle").textContent = "Outputs · " + r.out_dir; $("#galSub").textContent = r.id ? "from run " + r.id + " (current files in that folder)" : "current files";
     const ims = await this.imgs(r.out_dir);
-    $("#gallery").innerHTML = ims.length ? ims.map(i => `<div class="thumb"><img loading="lazy" src="${fileUrl(i.file)}" data-cap="${esc(i.file)}"><div class="cap"><span title="${esc(i.file)}">${esc(i.file.split("/").pop())}</span><a class="btn sm ghost" href="${fileUrl(i.file, 1)}">↓</a></div></div>`).join("") : '<div class="emptybox">No PNGs in this folder yet.</div>';
-    $$("#gallery img").forEach(im => im.onclick = () => { $("#lightbox img").src = im.src; $(".lb-cap").textContent = im.dataset.cap; $("#lightbox").classList.add("show") });
+    const ordered = [...ims].sort((a, b) => {
+      const rank = n => /pca_rgb/.test(n) ? 0 : /mnf_rgb/.test(n) ? 1 : /window_/.test(n) ? 2 : 3;
+      return rank(a.file) - rank(b.file);
+    });
+    $("#gallery").innerHTML = ordered.length ? ordered.map(i => `<div class="thumb"><img src="${fileUrl(i.file)}" data-cap="${esc(i.file)}"><div class="cap"><span title="${esc(i.file)}">${esc(i.file.split("/").pop())}</span><a class="btn sm ghost" href="${fileUrl(i.file, 1)}">↓</a></div></div>`).join("") : '<div class="emptybox">No PNGs in this folder yet.</div>';
+    $$("#gallery img").forEach(im => { im.onerror = () => im.closest(".thumb")?.remove(); im.onclick = () => { $("#lightbox img").src = im.src; $(".lb-cap").textContent = im.dataset.cap; $("#lightbox").classList.add("show") } });
   }
 };
 $("#lightbox").onclick = () => $("#lightbox").classList.remove("show");
@@ -653,7 +669,7 @@ async function boot() {
     setInterval(loadStatus, 15000);
     api("/api/jobs/current").then(j => j && Run.attach(j)).catch(() => { });
   }
-  const def = window.STATIC ? "pipeline" : "run";
+  const def = window.STATIC ? "explorer" : "run";
   go((location.hash || ("#" + def)).slice(1) in pages ? (location.hash || ("#" + def)).slice(1) : def);
 }
 boot();

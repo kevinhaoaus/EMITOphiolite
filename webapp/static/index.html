@@ -11,12 +11,12 @@
   <div class="wrap topbar-in">
     <div class="wordmark">Serpentine <span>Signals</span></div>
     <nav>
+      <a data-page="explorer">The map</a>
+      <a data-page="scores">Mineral match</a>
+      <a data-page="l2b">NASA's map</a>
+      <a data-page="pipeline">How it works</a>
+      <a data-page="runs">Past runs</a>
       <a data-page="run" class="active">Run</a>
-      <a data-page="pipeline">Pipeline</a>
-      <a data-page="explorer">Map</a>
-      <a data-page="scores">Scores</a>
-      <a data-page="l2b">Minerals</a>
-      <a data-page="runs">Runs</a>
     </nav>
     <div class="topbar-r">
       <div id="jobPill" class="pill idle"><span class="dot"></span><span id="jobPillText">idle</span></div>
@@ -27,11 +27,19 @@
 
 <main class="wrap">
   <section class="hero">
-    <div class="eyebrow">EMIT L2A reflectance · 20 February 2026 · granule 2605105_013</div>
-    <h1>Serpentine Signals</h1>
-    <p class="lede">Streaming Hyperspectral Mapping of Carbon-Storage Minerals in the Samail Ophiolite with NASA EMIT</p>
+    <div class="eyebrow">Oman · Samail ophiolite · NASA EMIT · 20 February 2026</div>
+    <h1>Where these rocks can lock CO₂ into stone</h1>
+    <p class="lede">Mantle rock in Oman can turn carbon dioxide into solid minerals. This map shows where serpentine and carbonate already are in one real satellite scene, so a storage team knows where to look.</p>
+    <div class="howto">
+      <p>Open the map and pick a mineral such as lizardite or calcite. Brighter ground means the satellite spectrum looks more like that mineral. A bright pixel is not a tonne of stored carbon, and it does not mean anyone owns the land.</p>
+      <div class="howto-actions">
+        <button class="btn primary" type="button" data-goto="explorer">Open the map</button>
+        <button class="btn" type="button" data-goto="scores">Compare minerals</button>
+        <button class="btn" type="button" data-goto="l2b">Check NASA's map</button>
+      </div>
+    </div>
     <div class="stats" id="stats"></div>
-    <div class="static-note" id="staticNote" hidden>This is a read-only showcase of a completed run. Launching the pipeline requires the local app on your machine.</div>
+    <div class="static-note" id="staticNote" hidden>You are looking at a finished map from 20 February 2026. Launching a new run works only in the local app.</div>
   </section>
 
   <!-- RUN -->
